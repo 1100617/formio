@@ -1,0 +1,40 @@
+version: '2.1'
+
+services:
+  mongodb:
+    image: mongo:3.4.3
+    ports:
+      - "127.0.0.1:27017:27017"
+    environment:
+      SERVICE_IGNORE: 'true'
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ['CMD-SHELL', 'echo "db.stats().ok" | mongo localhost/formioapp --quiet']
+      interval: 5s
+      timeout: 1s
+      retries: 10
+
+  formio:
+    image: "pedror10/formio:latest"
+    ports:
+      - "3001:3001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - formio_data:/data
+    links:
+      - mongodb:formio_mongodb
+
+volumes:
+  mongodb_data:
+    driver: local
+
+  formio_data:
+    driver: local
+
+#networks:
+#  default:
+#    external:
+#      name: '${NETWORK}'
