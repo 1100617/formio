@@ -4,7 +4,7 @@ services:
   mongodb:
     image: mongo:3.4.3
     ports:
-      - "127.0.0.1:27017:27017"
+      - "27017:27017"
     environment:
       SERVICE_IGNORE: 'true'
     volumes:
@@ -14,6 +14,8 @@ services:
       interval: 5s
       timeout: 1s
       retries: 10
+    networks: 
+      mongodb
 
   formio:
     image: "pedror10/formio:latest"
@@ -25,7 +27,9 @@ services:
     volumes:
       - formio_data:/data
     links:
-      - mongodb:formio_mongodb
+      - mongodb
+    networks: 
+      - mongodb
 
 volumes:
   mongodb_data:
@@ -34,7 +38,7 @@ volumes:
   formio_data:
     driver: local
 
-#networks:
-#  default:
-#    external:
-#      name: '${NETWORK}'
+networks:
+  default:
+    external:
+      name: mongodb
