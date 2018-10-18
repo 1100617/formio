@@ -15,7 +15,9 @@ services:
       timeout: 1s
       retries: 10
     networks: 
-      mongodb
+      - mongodb
+    logging:
+      driver: none
 
   formio:
     image: "pedror10/formio:latest"
@@ -30,6 +32,8 @@ services:
       - mongodb
     networks: 
       - mongodb
+    stdin_open: true
+    tty: true
 
 volumes:
   mongodb_data:
@@ -39,6 +43,6 @@ volumes:
     driver: local
 
 networks:
-  default:
-    external:
-      name: mongodb
+  mongodb:
+    name: mongodb
+    driver: bridge
