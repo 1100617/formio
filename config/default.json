@@ -1,6 +1,6 @@
 {
   "port": 3001,
-  "appPort": 8080,
+  "appPort": 3002,
   "host": "localhost:3001",
   "protocol": "http",
   "domain": "http://localhost:3001",
