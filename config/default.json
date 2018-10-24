@@ -1,9 +1,9 @@
 {
   "port": 3001,
   "appPort": 3002,
-  "host": "localhost:3001",
+  "host": "piccini.xyz:3001",
   "protocol": "http",
-  "domain": "http://localhost:3001",
+  "domain": "http://piccini.xyz:3001",
   "basePath": "",
   "mongo": "mongodb://mongodb:27017/formioapp",
   "mongoSecret": "--- change me now ---",
