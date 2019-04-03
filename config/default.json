@@ -6,6 +6,8 @@
   "domain": "http://10.1.1.16:8587",
   "basePath": "",
   "mongo": "mongodb://mongodb:27017/formioapp",
+  "mongoConfig": "",
+  "mongoSA": "",
   "mongoSecret": "--- change me now ---",
   "reservedForms": [
     "submission",
@@ -17,7 +19,8 @@
     "import",
     "form",
     "access",
-    "token"
+    "token",
+    "recaptcha"
   ],
   "jwt": {
     "secret": "--- change me now ---",
@@ -36,7 +39,7 @@
       "cert": "",
       "thumbprint": ""
     },
-    "database": {
+    "databases": {
       "mysql": {
         "host": "",
         "port": "",

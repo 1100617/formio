@@ -1,11 +1,16 @@
 'use strict';
 const request = require('request');
 
+const LOG_EVENT = 'Email Action';
+
 module.exports = function(router) {
   const Action = router.formio.Action;
+  const hook = require('../util/hook')(router.formio);
   const emailer = require('../util/email')(router.formio);
   const debug = require('debug')('formio:action:email');
-  const macros = require('./macros/macros');
+  const ecode = router.formio.util.errorCodes;
+  const logOutput = router.formio.log || debug;
+  const log = (...args) => logOutput(LOG_EVENT, ...args);
 
   /**
    * EmailAction class.
@@ -40,6 +45,7 @@ module.exports = function(router) {
       // Get the available transports.
       emailer.availableTransports(req, function(err, availableTransports) {
         if (err) {
+          log(req, ecode.emailer.ENOTRANSP, err);
           return next(err);
         }
         const settingsForm = [
@@ -108,6 +114,7 @@ module.exports = function(router) {
             label: 'Email Template URL',
             key: 'template',
             inputType: 'text',
+            defaultValue: 'https://pro.formview.io/assets/email.html',
             type: 'textfield',
             multiple: false,
             placeholder: 'Enter a URL for your external email template.'
@@ -148,10 +155,13 @@ module.exports = function(router) {
       // Load the form for this request.
       router.formio.cache.loadCurrentForm(req, (err, form) => {
         if (err) {
+          log(req, ecode.cache.EFORMLOAD, err);
           return next(err);
         }
         if (!form) {
-          return next(new Error('Form not found.'));
+          const err = new Error(ecode.form.ENOFORM);
+          log(req, ecode.cache.EFORMLOAD, err);
+          return next(err);
         }
 
         // Dont block on sending emails.
@@ -166,7 +176,7 @@ module.exports = function(router) {
           };
 
           const submissionModel = req.submissionModel || router.formio.resources.submission.model;
-          return submissionModel.findOne(query)
+          return submissionModel.findOne(hook.alter('submissionQuery', query, req))
           .then(owner => {
             return owner.toObject();
           })
@@ -195,20 +205,15 @@ module.exports = function(router) {
             });
           })
           .then(template => {
-            // Prepend the macros to the message so that they can use them.
-            this.settings.message = macros + template;
-
-            // Send the email.
+            this.settings.message = template;
             emailer.send(req, res, this.settings, params, (err) => {
               if (err) {
-                debug(`[error]: ${JSON.stringify(err)}`);
+                log(req, ecode.emailer.ESENDMAIL, JSON.stringify(err));
               }
             });
           });
         })
-        .catch(err => {
-          debug(err);
-        });
+        .catch(err => log(req, ecode.emailer.ESUBPARAMS, err));
       });
     }
   }

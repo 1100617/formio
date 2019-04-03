@@ -4,7 +4,7 @@ services:
   mongodb:
     image: mongo:3.4.3
     ports:
-      - "27017:27017"
+      - "27020:27017"
     environment:
       SERVICE_IGNORE: 'true'
     volumes:
@@ -14,15 +14,15 @@ services:
       interval: 5s
       timeout: 1s
       retries: 10
-    networks: 
+    networks:
       - mongodb
     logging:
       driver: none
 
   formio:
-    image: "pedror10/formio:latest"
+    image: "pedror10/formio-ocm:latest"
     ports:
-      - "3001:3001"
+      - "8587:3001"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -30,19 +30,27 @@ services:
       - formio_data:/data
     links:
       - mongodb
-    networks: 
+    networks:
       - mongodb
-    stdin_open: true
-    tty: true
+      - glinttcamundadocker_camunda-network
 
 volumes:
   mongodb_data:
     driver: local
-
+    driver_opts:
+       type: none
+       o: bind
+       device: /data/camunda/GlinttFormio/dbfolder/mongodb_data
   formio_data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/camunda/GlinttFormio/dbfolder/formio_data
 
 networks:
   mongodb:
     name: mongodb
     driver: bridge
+  glinttcamundadocker_camunda-network:
+    external: true

@@ -8,7 +8,7 @@
  *
  * @type {exports}
  */
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const util = require('../util/util');
 const _ = require('lodash');
@@ -52,6 +52,7 @@ module.exports = function(router) {
 
     let isAllowed = false;
     const allowed = decoded.allow.split(',');
+    const urlParts = req.url.split('?');
     _.each(allowed, function(allow) {
       const parts = allow.split(':');
       if (parts.length < 2) {
@@ -65,7 +66,7 @@ module.exports = function(router) {
 
       try {
         const regex = new RegExp(parts[1]);
-        if (regex.test(req.baseUrl + req.url)) {
+        if (regex.test(req.baseUrl + urlParts[0])) {
           isAllowed = true;
           return false;
         }
@@ -229,7 +230,7 @@ module.exports = function(router) {
 
     // Find the user object.
     const submissionModel = req.submissionModel || router.formio.resources.submission.model;
-    submissionModel.findOne(query, function(err, user) {
+    submissionModel.findOne(hook.alter('submissionQuery', query, req)).lean().exec((err, user) => {
       if (err) {
         return next(err);
       }
@@ -237,7 +238,6 @@ module.exports = function(router) {
         return next('User or password was incorrect');
       }
 
-      user = user.toObject();
       if (!_.get(user.data, passField)) {
         return next('Your account does not have a password. You must reset your password to login.');
       }
@@ -255,15 +255,13 @@ module.exports = function(router) {
         router.formio.resources.form.model.findOne({
           _id: user.form,
           deleted: {$eq: null}
-        }, function(err, form) {
+        }).lean().exec((err, form) => {
           if (err) {
             return next(err);
           }
           if (!form) {
             return next('User form not found.');
           }
-
-          form = form.toObject();
 
           // Allow anyone to hook and modify the user.
           hook.alter('user', user, function hookUserCallback(err, _user) {

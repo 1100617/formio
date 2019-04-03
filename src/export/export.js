@@ -22,7 +22,7 @@ module.exports = (router) => {
 
     // Handle unknown formats.
     if (!exporters.hasOwnProperty(format)) {
-      return res.status(500).send('Unknown format');
+      return res.status(400).send('Unknown format');
     }
 
     // Load the form.
@@ -60,7 +60,7 @@ module.exports = (router) => {
       // Allow an alter of the export logic.
       hook.alter('export', req, query, form, exporter, (err) => {
         if (err) {
-          return res.status(500).send(err.message);
+          return res.status(400).send(err.message);
         }
 
         // Initialize the exporter.
@@ -87,11 +87,9 @@ module.exports = (router) => {
 
             // Create the query stream.
             const submissionModel = req.submissionModel || router.formio.resources.submission.model;
-            const stream = submissionModel.find(query)
+            const stream = submissionModel.find(hook.alter('submissionQuery', query, req)).lean()
               .cursor()
-              .pipe(through(function(doc) {
-                const row = doc.toObject({getters: true, virtuals: false});
-
+              .pipe(through(function(row) {
                 addUrl(row.data);
                 router.formio.util.removeProtectedFields(form, 'export', row);
 
@@ -103,7 +101,7 @@ module.exports = (router) => {
           })
           .catch((error) => {
             // Send the error.
-            res.status(500).send(error);
+            res.status(400).send(error);
           });
       });
     });

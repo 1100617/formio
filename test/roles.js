@@ -10,7 +10,7 @@ var chance = new (require('chance'))();
 
 module.exports = function(app, template, hook) {
   var Helper = require('./helper')(app);
-  
+
   describe('Roles', function() {
     // Store the temp role for this test suite.
     var tempRole = {
@@ -169,10 +169,10 @@ module.exports = function(app, template, hook) {
 
       it('Cant access a Role without a valid Role Id', function(done) {
         request(app)
-          .get(hook.alter('url', '/role/💩', template))
+          .get(hook.alter('url', '/role/2342342344234', template))
           .set('x-jwt-token', template.users.admin.token)
           .expect('Content-Type', /json/)
-          .expect(500)
+          .expect(400)
           .end(function(err, res) {
             if (err) {
               return done(err);
@@ -190,6 +190,15 @@ module.exports = function(app, template, hook) {
           .get(hook.alter('url', '/role', template))
           .set('x-jwt-token', template.users.user1.token)
           .expect(401)
+          .end(done);
+      });
+
+      it('should not be able to PATCH a role', function(done) {
+        request(app)
+          .patch(hook.alter('url', '/role/' + template.roles.tempRole._id, template))
+          .set('x-jwt-token', template.users.admin.token)
+          .send([{op: 'replace', path: 'default', value: false}])
+          .expect(405)
           .end(done);
       });
     });

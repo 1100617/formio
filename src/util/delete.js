@@ -43,7 +43,7 @@ module.exports = (router) => {
     }
 
     const submissionModel = req.submissionModel || router.formio.resources.submission.model;
-    return submissionModel.find(query).exec()
+    return submissionModel.find(hook.alter('submissionQuery', query, req)).exec()
       .then((submissions) => {
         if (!submissions || submissions.length === 0) {
           return Promise.resolve();
@@ -222,7 +222,7 @@ module.exports = (router) => {
       };
       const submissionModel = req.submissionModel || router.formio.resources.submission.model;
 
-      return submissionModel.find(query).exec()
+      return submissionModel.find(hook.alter('submissionQuery', query, req)).exec()
         .then((submissions) => {
           if (!submissions || submissions.length === 0) {
             return Promise.resolve();
@@ -245,7 +245,7 @@ module.exports = (router) => {
     // Build the search query and allow anyone to hook it.
     const query = hook.alter('formQuery', {deleted: {$eq: null}}, req);
 
-    return router.formio.resources.form.model.find(query).select('_id').exec()
+    return router.formio.resources.form.model.find(query).select('_id').lean().exec()
       .then((forms) => {
         if (!forms) {
           return Promise.resolve();

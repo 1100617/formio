@@ -107,12 +107,19 @@ module.exports = (router) => {
     if (!entity.hasOwnProperty(`form`)) {
       return false;
     }
+    const formName = entity.form;
     if (template.hasOwnProperty(`forms`) && template.forms.hasOwnProperty(entity.form)) {
-      entity.form = template.forms[entity.form]._id.toString();
+      entity.form = template.forms[formName]._id.toString();
+      if (template.forms[formName].hasOwnProperty('_vid') && template.forms[formName]._vid) {
+        entity.formRevision = template.forms[formName]._vid.toString();
+      }
       return true;
     }
     if (template.hasOwnProperty(`resources`) && template.resources.hasOwnProperty(entity.form)) {
-      entity.form = template.resources[entity.form]._id.toString();
+      entity.form = template.resources[formName]._id.toString();
+      if (template.resources[formName].hasOwnProperty('_vid') && template.resources[formName]._vid) {
+        entity.formRevision = template.resources[formName]._vid.toString();
+      }
       return true;
     }
 
@@ -130,15 +137,22 @@ module.exports = (router) => {
 
     let changes = false;
 
+    const formName = entity.form;
     // Attempt to add a form.
     if (template.forms && template.forms[entity.form] && template.forms[entity.form]._id) {
-      entity.form = template.forms[entity.form]._id.toString();
+      entity.form = template.forms[formName]._id.toString();
+      if (template.forms[formName].hasOwnProperty('_vid') && template.forms[formName]._vid) {
+        entity.formRevision = template.forms[formName]._vid.toString();
+      }
       changes = true;
     }
 
     // Attempt to add a resource
     if (!changes && template.resources && template.resources[entity.form] && template.resources[entity.form]._id) {
       entity.form = template.resources[entity.form]._id.toString();
+      if (template.resources[formName].hasOwnProperty('_vid') && template.resources[formName]._vid) {
+        entity.formRevision = template.resources[formName]._vid.toString();
+      }
       changes = true;
     }
 
@@ -249,7 +263,18 @@ module.exports = (router) => {
       },
       transform: (template, role) => role,
       query(document, template) {
-        const query = {machineName: document.machineName, deleted: {$eq: null}};
+        const query = {
+          $or: [
+            {
+              machineName: document.machineName,
+              deleted: {$eq: null}
+            },
+            {
+              title: document.title,
+              deleted: {$eq: null}
+            }
+          ]
+        };
         return hook.alter(`importRoleQuery`, query, document, template);
       }
     },
@@ -280,24 +305,38 @@ module.exports = (router) => {
           model.findOneAndUpdate(
             {_id: resource._id, deleted: {$eq: null}},
             {components: resource.components},
-            {new: true},
-            (err, doc) => {
-              if (err) {
-                return next(err);
-              }
-              if (!doc) {
-                return next();
-              }
-
-              resources[machineName] = doc.toObject();
-              debug.cleanUp(`Updated resource component _ids for`, machineName);
-              next();
+            {new: true}
+          ).lean().exec((err, doc) => {
+            if (err) {
+              return next(err);
             }
-          );
+            if (!doc) {
+              return next();
+            }
+
+            resources[machineName] = doc;
+            debug.cleanUp(`Updated resource component _ids for`, machineName);
+            next();
+          });
         }, done);
       },
       query(document, template) {
-        const query = {machineName: document.machineName, deleted: {$eq: null}};
+        const query = {
+          $or: [
+            {
+              machineName: document.machineName,
+              deleted: {$eq: null}
+            },
+            {
+              name: document.name,
+              deleted: {$eq: null}
+            },
+            {
+              path: document.path,
+              deleted: {$eq: null}
+            }
+          ]
+        };
         return hook.alter(`importFormQuery`, query, document, template);
       }
     },
@@ -328,24 +367,38 @@ module.exports = (router) => {
           model.findOneAndUpdate(
             {_id: form._id, deleted: {$eq: null}},
             {components: form.components},
-            {new: true},
-            (err, doc) => {
-              if (err) {
-                return next(err);
-              }
-              if (!doc) {
-                return next();
-              }
-
-              forms[machineName] = doc.toObject();
-              debug.cleanUp(`Updated form component _ids for`, machineName);
-              next();
+            {new: true}
+          ).lean().exec((err, doc) => {
+            if (err) {
+              return next(err);
             }
-          );
+            if (!doc) {
+              return next();
+            }
+
+            forms[machineName] = doc;
+            debug.cleanUp(`Updated form component _ids for`, machineName);
+            next();
+          });
         }, done);
       },
       query(document, template) {
-        const query = {machineName: document.machineName, deleted: {$eq: null}};
+        const query = {
+          $or: [
+            {
+              machineName: document.machineName,
+              deleted: {$eq: null}
+            },
+            {
+              name: document.name,
+              deleted: {$eq: null}
+            },
+            {
+              path: document.path,
+              deleted: {$eq: null}
+            }
+          ]
+        };
         return hook.alter(`importFormQuery`, query, document, template);
       }
     },
@@ -370,7 +423,14 @@ module.exports = (router) => {
         return action;
       },
       query(document, template) {
-        const query = {machineName: document.machineName, deleted: {$eq: null}};
+        const query = {
+          $or: [
+            {
+              machineName: document.machineName,
+              deleted: {$eq: null}
+            }
+          ]
+        };
         return hook.alter(`importActionQuery`, query, document, template);
       }
     }
@@ -443,7 +503,7 @@ module.exports = (router) => {
             deleted: {$eq: null}
           };
 
-          model.findOne(query, (err, doc) => {
+          model.findOne(query).exec((err, doc) => {
             if (err) {
               debug.install(err);
               return next(err);

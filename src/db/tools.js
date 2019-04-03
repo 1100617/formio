@@ -20,7 +20,7 @@ module.exports = function(db, schema) {
       schema.findOneAndUpdate(
         {key: 'formio'},
         {$set: {version: version}},
-        function(err, document) {
+        (err, document) => {
           if (err) {
             throw err;
           }

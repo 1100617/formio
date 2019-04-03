@@ -163,11 +163,8 @@ module.exports = function(router) {
               return callback(`No Form found with formId: ${req.formId}`);
             }
 
-            // If this a Resource, search for the presence of Self Access Permissions.
-            if (item.type === 'resource') {
-              // Attempt to load the Self Access Permissions.
-              getSelfAccessPermissions(req, item, access);
-            }
+            // Attempt to load the Self Access Permissions.
+            getSelfAccessPermissions(req, item, access);
 
             // Add the defined access types for the form.
             if (item.access) {
@@ -253,9 +250,54 @@ module.exports = function(router) {
           });
         },
 
+        // Get a list of all roles associated with this access check.
+        function getAccessRoles(callback) {
+          // Load all the roles.
+          router.formio.resources.role.model.find(hook.alter('roleQuery', {
+            deleted: {$eq: null}
+          }, req), function(err, roles) {
+            if (err) {
+              return callback(400);
+            }
+
+            // Get a list of all valid roles this user can have.
+            const validRoles = (roles && roles.length) ? roles.map((role) => {
+              const roleId = role._id.toString();
+              if (role.default) {
+                access.defaultRole = roleId;
+              }
+              if (role.admin) {
+                access.adminRole = roleId;
+              }
+              return roleId;
+            }) : [];
+
+            // Default the access roles.
+            access.roles = [access.defaultRole];
+
+            // Ensure the user only has valid roles.
+            if (req.user) {
+              access.roles = _(req.user.roles || [])
+                .filter()
+                .map(util.idToString)
+                .intersection(validRoles)
+                .uniq()
+                .value();
+
+              if (req.user._id && (req.user._id !== 'external')) {
+                access.roles.push(req.user._id.toString());
+              }
+            }
+
+            // Add the EVERYONE role.
+            access.roles.push(EVERYONE);
+            callback();
+          });
+        },
+
         // Determine if this is a possible index request against submissions.
         function flagRequestAsSubmissionResourceAccess(callback) {
-          if (req.method !== 'GET') {
+          if (req.method.toUpperCase() !== 'GET') {
             return callback();
           }
 
@@ -263,45 +305,33 @@ module.exports = function(router) {
             return callback();
           }
 
-          if (!_.has(req, 'user._id')) {
+          // Does not apply if the user doesn't have any roles.
+          const userRoles = _.get(req, 'user.roles', []);
+          if (!userRoles.length) {
             return callback();
           }
 
-          const user = req.user._id;
-          const search = [util.idToBson(user)];
-          hook.alter('resourceAccessFilter', search, req, function(err, search) {
-            // Try to recover if the hook fails.
+          // Load the form, and get its roles/permissions data.
+          router.formio.cache.loadForm(req, null, req.formId, function(err, item) {
             if (err) {
-              return callback();
+              return callback(err);
+            }
+            if (!item) {
+              return callback(`No Form found with formId: ${req.formId}`);
             }
 
-            const query = {
-              form: util.idToBson(req.formId),
-              deleted: {$eq: null},
-              $or: [
-                {
-                  'access.type': {$in: ['read', 'write', 'admin']},
-                  'access.resources': {$in: search}
-                }
-              ]
-            };
-
-            const submissionModel = req.submissionModel || router.formio.resources.submission.model;
-            submissionModel.countDocuments(query, function(err, count) {
-              if (err) {
-                return callback();
-              }
-
-              if (count > 0) {
-                req.submissionResourceAccessFilter = true;
-
+            // See if any of our components have "defaultPermission" established.
+            util.eachComponent(item.components, (component) => {
+              if (component.defaultPermission) {
                 // Since the access is now determined by the submission resource access, we
                 // can skip the owner filter.
                 req.skipOwnerFilter = true;
+                req.submissionResourceAccessFilter = true;
+                return true;
               }
-
-              callback();
             });
+
+            return callback();
           });
         }
       ], req, res, access), function(err) {
@@ -309,40 +339,7 @@ module.exports = function(router) {
           return done(err);
         }
 
-        // Load a specific role.
-        const loadRole = function(name, query, done) {
-          // Load the default role.
-          access[name] = hook.alter(name, null, access);
-          if (access[name]) {
-            done(null, access);
-          }
-          else {
-            // Load the default role.
-            router.formio.resources.role.model.findOne(hook.alter('roleQuery', query, req), function(err, role) {
-              if (err) {
-                return done(err);
-              }
-
-              if (role) {
-                access[name] = role._id.toString();
-              }
-
-              done(null, access);
-            });
-          }
-        };
-
-        // Load all of the applicable roles.
-        async.series([
-          async.apply(loadRole, 'defaultRole', {default: true}),
-          async.apply(loadRole, 'adminRole', {admin: true})
-        ], function(err) {
-          if (err) {
-            return done(err);
-          }
-
-          done(null, access);
-        });
+        done(null, access);
       });
     },
 
@@ -364,30 +361,7 @@ module.exports = function(router) {
     /* eslint-disable max-statements */
     hasAccess(req, access, entity, res) {
       const method = req.method.toUpperCase();
-      let roles = [access.defaultRole, EVERYONE];
-      let user = null;
-      if (req.user) {
-        user = util.idToString(req.user._id);
-
-        // Get the roles for the permission checks.
-        req.user.roles = req.user.roles || [];
-
-        // If the user actually has roles, remove the default role and check their access using their roles.
-        if (req.user.roles.length > 0) {
-          // Add the users id to the roles to check for submission resource access.
-          req.user.roles.push(user);
-
-          // Add the everyone role.
-          req.user.roles.push(EVERYONE);
-
-          // Ensure that all roles are strings to be compatible for comparison.
-          roles = _(req.user.roles)
-            .filter()
-            .map(util.idToString)
-            .uniq()
-            .value();
-        }
-      }
+      const user = req.user ? util.idToString(req.user._id) : null;
 
       // Setup some flags for other handlers.
       req.isAdmin = false;
@@ -397,6 +371,7 @@ module.exports = function(router) {
         'POST': {all: 'create_all', own: 'create_own'},
         'GET': {all: 'read_all', own: 'read_own'},
         'PUT': {all: 'update_all', own: 'update_own'},
+        'PATCH': {all: 'update_all', own: 'update_own'},
         'DELETE': {all: 'delete_all', own: 'delete_own'}
       };
 
@@ -419,7 +394,7 @@ module.exports = function(router) {
       }
 
       // Check to see if this user has an admin role.
-      const hasAdminRole = access.adminRole ? (_.indexOf(roles, access.adminRole) !== -1) : false;
+      const hasAdminRole = access.adminRole ? (_.indexOf(access.roles, access.adminRole) !== -1) : false;
       if (hasAdminRole || hook.alter('isAdmin', req.isAdmin, req)) {
         req.isAdmin = true;
         return true;
@@ -435,7 +410,7 @@ module.exports = function(router) {
         return access[entity.type][type] &&
           (
             (access[entity.type][type] === true) ||
-            (access[entity.type][type].length && _.intersection(access[entity.type][type], roles).length)
+            (access[entity.type][type].length && _.intersection(access[entity.type][type], access.roles).length)
           );
       };
 
@@ -463,7 +438,7 @@ module.exports = function(router) {
         const submissionResourceAdmin = (_.get(req, 'submissionResourceAccessAdminBlock') || []);
         if (
           (req.method === 'POST' || req.method === 'PUT') &&
-          !_.intersection(submissionResourceAdmin, roles).length
+          !_.intersection(submissionResourceAdmin, access.roles).length
         ) {
           // Allow them to assign the owner.
           req.assignOwner = true;
@@ -476,6 +451,14 @@ module.exports = function(router) {
 
         // Skip the owner filter if they have all access.
         req.skipOwnerFilter = true;
+
+        // Do not include the submission resource access filter if they have "all" access.
+        req.submissionResourceAccessFilter = false;
+        _hasAccess = true;
+      }
+
+      // If resource access applies, then allow for that to be in the query.
+      if (_.has(req, 'submissionResourceAccessFilter') && req.submissionResourceAccessFilter) {
         _hasAccess = true;
       }
 
@@ -510,25 +493,27 @@ module.exports = function(router) {
     req.permissionsChecked = true;
 
     // Check for whitelisted paths.
+    let skip = false;
     if (req.method === 'GET') {
-      const whitelist = ['/health', '/current', '/logout', '/access', '/token'];
-      let skip = _.some(whitelist, function(path) {
-        if ((req.url === path) || (req.url === hook.alter('path', path, req))) {
+      const whitelist = ['/health', '/current', '/logout', '/access', '/token', '/recaptcha'];
+      const url = req.url.split('?')[0];
+      skip = _.some(whitelist, function(path) {
+        if ((url === path) || (url === hook.alter('path', path, req))) {
           return true;
         }
 
         return false;
       });
+    }
 
-      // Allow the private hook of skip to be run, if it didnt already pass the whitelist.
-      if (!skip) {
-        skip = hook.alter('skip', false, req);
-      }
+    // Allow the private hook of skip to be run, if it didnt already pass the whitelist.
+    if (!skip) {
+      skip = hook.alter('skip', false, req);
+    }
 
-      // If there is a whitelist match, then move onto the next middleware.
-      if (skip) {
-        return next();
-      }
+    // If there is a whitelist match, then move onto the next middleware.
+    if (skip) {
+      return next();
     }
 
     // Determine if we are trying to access and entity of the form or submission.

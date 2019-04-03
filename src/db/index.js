@@ -3,6 +3,7 @@
 const async = require('async');
 const MongoClient = require('mongodb').MongoClient;
 const semver = require('semver');
+const request = require('request');
 const _ = require('lodash');
 const fs = require('fs');
 const debug = {
@@ -81,7 +82,7 @@ module.exports = function(formio) {
       {key: 'formio'},
       {$set: {isLocked: currentLock.isLocked}},
       {returnOriginal: false},
-      function(err, result) {
+      (err, result) => {
         if (err) {
           return next(err);
         }
@@ -91,6 +92,38 @@ module.exports = function(formio) {
         next();
       }
     );
+  };
+
+  /**
+   * Fetch the SA certificate.
+   *
+   * @param next
+   * @return {*}
+   */
+  const getSA = function(next) {
+    if (!config.mongoSA) {
+      return next();
+    }
+
+    // If they provide the SA url, then fetch it from there.
+    if (config.mongoSA.indexOf('http') === 0) {
+      debug.db(`Fetching SA Certificate ${config.mongoSA}`);
+      request.get(config.mongoSA, (err, response, body) => {
+        if (err || !body) {
+          debug.db(`Unable to fetch SA Certificate: ${err}`);
+          unlock(function() {
+            throw new Error(`Unable to fetch the SA Certificate: ${config.mongoSA}.`);
+          });
+        }
+
+        debug.db('Fetched SA Certificate');
+        config.mongoSA = body;
+        return next();
+      });
+    }
+    else {
+      return next();
+    }
   };
 
   /**
@@ -114,13 +147,23 @@ module.exports = function(formio) {
       : config.mongo[0];
 
     debug.db(`Opening new connection to ${dbUrl}`);
+    const mongoConfig = config.mongoConfig ? JSON.parse(config.mongoConfig) : {};
+    if (!mongoConfig.hasOwnProperty('connectTimeoutMS')) {
+      mongoConfig.connectTimeoutMS = 300000;
+    }
+    if (!mongoConfig.hasOwnProperty('socketTimeoutMS')) {
+      mongoConfig.socketTimeoutMS = 300000;
+    }
+    if (!mongoConfig.hasOwnProperty('useNewUrlParser')) {
+      mongoConfig.useNewUrlParser = true;
+    }
+    if (config.mongoSA) {
+      mongoConfig.sslValidate = true;
+      mongoConfig.sslCA = config.mongoSA;
+    }
 
     // Establish a connection and continue with execution.
-    MongoClient.connect(dbUrl, {
-      connectTimeoutMS: 300000,
-      socketTimeoutMS: 300000,
-      useNewUrlParser: true
-    }, function(err, client) {
+    MongoClient.connect(dbUrl, mongoConfig, function(err, client) {
       if (err) {
         debug.db(`Connection Error: ${err}`);
         unlock(function() {
@@ -150,20 +193,20 @@ module.exports = function(formio) {
   /**
    * Test to see if the application has been installed. Install if not.
    */
-  const checkInstall = function(next) {
-    formio.util.log('Checking for db install.');
+  const checkSetup = function(next) {
+    formio.util.log('Checking for db setup.');
     db.listCollections().toArray().then(function(collections) {
       debug.db(`Collections found: ${collections.length}`);
       // 3 is an arbitrary length. We just want a general idea that things have been installed.
       if (collections.length < 3) {
-        formio.util.log(' > No install found. Starting new install.');
+        formio.util.log(' > No collections found. Starting new setup.');
         require(path.join(__dirname, '/install'))(db, config, function() {
-          formio.util.log(' > Install complete.\n');
+          formio.util.log(' > Setup complete.\n');
           next();
         });
       }
       else {
-        formio.util.log(' > Install found. No install necessary.\n');
+        formio.util.log(' > Setup complete.\n');
         return next();
       }
     });
@@ -236,7 +279,7 @@ module.exports = function(formio) {
      */
     const handleResponse = function(err) {
       if (err) {
-        return res.status(500).send(err);
+        return res.status(400).send(err);
       }
 
       return response
@@ -283,7 +326,7 @@ module.exports = function(formio) {
 
       debug.sanity('Checking formio schema');
       // A cached response was not viable here, query and update the cache.
-      schema.findOne({key: 'formio'}, function(err, document) {
+      schema.findOne({key: 'formio'}, (err, document) => {
         if (err || !document) {
           cache.full.isValid = false;
           cache.partial.isValid = false;
@@ -399,7 +442,7 @@ module.exports = function(formio) {
             {key: 'formio'},
             {$set: {isLocked: (new Date()).getTime()}},
             {returnOriginal: false},
-            function(err, result) {
+            (err, result) => {
               if (err) {
                 throw err;
               }
@@ -576,8 +619,9 @@ module.exports = function(formio) {
     }
 
     async.series([
+      getSA,
       connection,
-      checkInstall,
+      checkSetup,
       checkEncryption,
       getUpdates,
       lock,

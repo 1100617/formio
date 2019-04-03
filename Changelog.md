@@ -4,6 +4,174 @@ All notable changes to this project will be documented in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/)
 
+## 1.43.2
+### Fixed
+ - Fix permissions check on patch submission.
+ - Fix issue with deploying projects with forms configured with nested forms attached to specific versions.
+
+### Changed
+ - formiojs@3.18.1, mongoose@5.4.20
+
+## 1.43.1
+### Fixed
+ - The token handler to also call the user hooks for other kinds of tokens.
+
+### Changed
+ - Upgraded formiojs@3.18.0, mongodb@3.2.2
+
+## 1.43.0
+### Fixed
+ - Added a more efficient and complete role checking mechanism for permission handling.
+
+### Changed
+ - Updated bcrypt@3.0.5, jsonwebtoken@8.5.1, mssql@5.0.3, eslint@5.15.3, supertest@4.0.2, formiojs@3.17.4 
+
+## 1.42.1
+### Fixed
+ - Patch requests incorrectly patching files with encrypted fields.
+
+## 1.42.0
+### Removed
+ - Removed the macros from the email action since those are now added to the formio-workers library.
+
+### Changed
+ - Upgraded dependencies.
+
+## 1.41.3
+### Fixed
+ - Problem with a subform put request.
+
+## 1.41.2
+### Fixed
+ - Issues with the nested subform create and update when called from the API.
+ 
+### Changed
+ - Updated mocha@6.0.1
+
+## 1.41.1
+### Changed
+ - Default the email action to have a default email template.
+ - Upgraded mongoose@5.4.14, mssql@4.3.2, request-promise-native@1.0.7, formiojs@3.15.6, jsonwebtoken@8.5.0, eslint@5.14.1, mocha@6.0.0
+ 
+### Fixed
+ - Issue with subform validation to not include subforms that are conditionally hidden.
+ - Issue with subform validation where it will not process the subform requests if the subform is not present within the data.
+ - A potential crash within the subform validation where if the subform requests fails, it will cause the post request to not find a submission.
+ - The mongoose schema definitions from removing the _id property incorrectly.
+
+## 1.41.0
+### Added
+ - PATCH method support for submissions.
+ - Now allow more than GET requests to be skipped for permissions checks.
+ 
+### Changed
+ - Upgraded async@2.6.2, bcrypt@3.0.4, mongoose@5.4.10, nodemon@1.18.10, formiojs@3.14.1
+
+## 1.40.2
+### Fixed 
+ - When resetting passwords, jwtIssuedAfter sometimes got set to wrong timestamp resulting in invalid tokens.
+
+## 1.40.1
+### Added
+ - Ability to connect to SA enabled mongodb instances.
+ 
+### Changed
+ - Updated formiojs@3.13.9, mongoose@5.4.9, mssql@4.3.1, supertest@3.4.2, moment@2.24.0, eslint@5.13.0
+  
+## 1.40.0
+### Added
+ - reCAPTCHA API Endpoint
+ 
+### Changed
+ - mongodb@3.1.13, formiojs@3.13.0
+
+## 1.39.2
+### Fixed
+ - The tests to work with extended systems.
+
+## 1.39.1
+### Fixed
+ - Issue where read all permissions are ignored when resource submission access is established.
+ 
+### Changed
+ - Upgraded csv@5.1.1, mongodb@3.1.12, mongoose@5.4.5, formiojs@3.12.2, nodemailer@5.1.1, eslint@5.12.1, supertest@3.4.1
+
+## 1.39.0
+### Changed 
+ - Added more permissions form matching during import process to resolve conflicts.
+
+## 1.38.0
+### Added
+ - Minimal support for running entire stack in docker-compose
+ - FOR-644: Adding logging for form actions to help tracking execution and errors.
+
+### Fixed
+ - FOR-1908: Fixed problem where ID's could be set when creating records.
+ - FOR-1977: Issues with the resource access permissions where indexes were not performant and giving 401 errors.
+
+### Changed
+ - Upgraded bcrypt@3.0.3, debug@4.1.1, formiojs@3.10.2, joi@14.3.1, mongoose@5.4.2, csv@5.1.0, eslint@5.11.1
+ - Upgraded nodemailer to version 5: From their CHANGELOG - Start using dns.resolve() instead of dns.lookup() for resolving SMTP hostnames. Might be breaking change on some environments so upgrade with care
+
+## 1.37.7
+### Fixed
+ - The formio-workers dependency from using dynamic require paths which messes up certain builds.
+
+## 1.37.6
+### Fixed
+ - Issues with the resource permissions where it would only allow one resource per type.
+ - The default.json configuration to point to the correct "databases" config.
+
+### Changed
+ - Changed the installation to say "setup" instead of "install".
+ - Upgrade formiojs@3.9.3, mongoose@5.3.15, progress@2.0.3, chance@1.0.18, eslint@5.10.0
+
+## 1.37.5
+### Changed
+ - Updated to resourcejs v1.33.0 which changes more 500 errors to 400s.
+
+## 1.37.4
+### Fixed
+ - Potential issues with the recursive forms not loading correctly.
+
+## 1.37.3
+### Fixed
+ - Potential crash with the subform responses.
+ - Upgraded config@3.0.0, csv@5.0.0, mongoose@5.3.13, formiojs@3.9.0, joi@14.1.0, nodemailer@4.7.0
+
+## 1.37.0
+### Added
+ - Logging for action failures
+
+### Changed
+ - Respond with 400 errors instead of 500 when an error occurs.
+ 
+### Updated
+ - resourcejs 1.30.0
+
+## 1.36.0
+### Removed
+ - Merge form handler
+
+## 1.35.2
+### Changed
+ - Code cleanup
+ - API key regex.
+ - Upgraded
+   - JSONStream@1.3.5
+   - bcrypt@3.0.2
+   - express@4.16.4
+   - formiojs@3.6.12
+   - mongodb@3.1.8
+   - mongoose@5.3.7
+   - mssql@4.2.2
+   - progress@2.0.1
+   - nodemon@1.18.5
+   - debug@4.1.0
+   - resourcejs@1.28.0
+   - semver@5.6.0
+   - eslint@5.8.0
+
 ## 1.35.1
 ### Fixed
  - Issue where logging would sometimes crash when tokens do not contain user objects.

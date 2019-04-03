@@ -7,8 +7,8 @@ const Validator = require('../resources/Validator');
 
 module.exports = (router, resourceName, resourceId) => {
   const hook = require('../util/hook')(router.formio);
-  const fieldActions = require('../actions/fields/index')(router);
-  const propertyActions = require('../actions/properties/index')(router);
+  const fieldActions = require('../actions/fields')(router);
+  const propertyActions = require('../actions/properties')(router);
   const handlers = {};
 
   // Iterate through the possible handlers.
@@ -20,6 +20,10 @@ module.exports = (router, resourceName, resourceId) => {
     {
       name: 'update',
       method: 'Put'
+    },
+    {
+      name: 'update',
+      method: 'Patch'
     },
     {
       name: 'create',
@@ -185,7 +189,7 @@ module.exports = (router, resourceName, resourceId) => {
      */
     function validateSubmission(req, res, done) {
       // No need to validate on GET requests.
-      if (!(['POST', 'PUT'].includes(req.method) && req.body && !req.noValidate)) {
+      if (!(['POST', 'PUT', 'PATCH'].includes(req.method) && req.body && !req.noValidate)) {
         return done();
       }
 
@@ -288,7 +292,32 @@ module.exports = (router, resourceName, resourceId) => {
     }
 
     function alterSubmission(req, res, done) {
-      hook.alter('submission', req, res, done);
+      hook.alter('submission', req, res, () => {
+        if (
+          (req.handlerName === 'afterPost') ||
+          (req.handlerName === 'afterPut')
+        ) {
+          // Update the owner of the submission if roles are provided, and there is no owner.
+          if (
+            res.resource &&
+            res.resource.item &&
+            !res.resource.item.owner &&
+            res.resource.item.roles.length
+          ) {
+            res.resource.item.owner = res.resource.item._id;
+            const submissionModel = req.submissionModel || router.formio.resources.submission.model;
+            submissionModel.update({
+              _id: res.resource.item._id
+            }, {'$set': {owner: res.resource.item._id}}, done);
+          }
+          else {
+            done();
+          }
+        }
+        else {
+          done();
+        }
+      });
     }
 
     // Add before handlers.
