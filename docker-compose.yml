@@ -20,7 +20,9 @@ services:
       driver: none
 
   formio:
-    image: "pedror10/formio-ocm:latest"
+    image: "10.1.1.16:5020/formio:latest"
+    env_file:
+      - .env
     ports:
       - "8587:3001"
     depends_on:
