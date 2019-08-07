@@ -1,5 +1,6 @@
 {
     "host": "HOST",
     "protocol": "PROTOCOL",
-    "domain": "DOMAIN"
+    "domain": "DOMAIN",
+    "mongo": "MONGO"
 }
